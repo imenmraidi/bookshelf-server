@@ -15,15 +15,22 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS || "http://localhost:5173";
-app.use(cors({
-  origin: allowedOrigins.split(","),
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: allowedOrigins.split(","),
+    credentials: true,
+  })
+);
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
   res.setHeader("Access-Control-Allow-Credentials", true);
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
   next();
 });
 
