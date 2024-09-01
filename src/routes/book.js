@@ -16,5 +16,6 @@ router.put("/update/:id", auth, Controller.updateBook);
 router.put("/updateShelfIndex/:id", auth, Controller.updateShelfIndex);
 router.post("/addShelf", auth, Controller.addShelf);
 router.put("/renameShelf/:id", auth, Controller.renameShelf);
+router.get("/shareLibrary/:userId", auth, Controller.shareLibrary);
 
 module.exports = router;

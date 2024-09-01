@@ -2,9 +2,11 @@ const { OAuth2Client } = require("google-auth-library");
 const jwt = require("jsonwebtoken");
 const Book = require("../models/Book");
 const Shelf = require("../models/Shelf");
+const User = require("../models/User");
 const axios = require("axios");
 const bcrypt = require("bcrypt");
 const mongoose = require("mongoose"); // Import mongoose
+require("dotenv").config();
 require("dotenv").config();
 
 const searchBook = async (req, res) => {
@@ -110,63 +112,64 @@ const addBooks = async (req, res) => {
     res.status(500).send({ error });
   }
 };
+const groupBooksByShelfForUser = async userId => {
+  return await Shelf.aggregate([
+    { $match: { userId: userId } }, // Match shelves by userId
+    {
+      $lookup: {
+        from: "books", // Join with the books collection
+        localField: "_id", // Match shelfId in books
+        foreignField: "shelfId",
+        as: "books", // Store matched books in an array named 'books'
+      },
+    },
+    {
+      $addFields: {
+        books: {
+          $sortArray: { input: "$books", sortBy: { index: 1 } }, // Sort books by index within each shelf
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1, // Include the shelf's _id
+        shelf: "$shelfName",
+        status: 1,
+        shelfIndex: 1,
+        books: {
+          _id: 1,
+          code: 1,
+          title: 1,
+          authors: 1,
+          pageCount: 1,
+          publishedDate: 1,
+          description: 1,
+          cover: 1,
+          shelfId: 1,
+          startedAt: 1,
+          finishedAt: 1,
+          rating: 1,
+          notes: 1,
+          status: 1,
+          tag: 1,
+          hide: 1,
+        },
+      },
+    },
+  ]);
+};
 
 const groupBooksByShelf = async (req, res) => {
   try {
     const { userId } = req.body;
-
-    const shelvesWithBooks = await Shelf.aggregate([
-      { $match: { userId: userId } }, // Match shelves by userId
-      {
-        $lookup: {
-          from: "books", // Join with the books collection
-          localField: "_id", // Match shelfId in books
-          foreignField: "shelfId",
-          as: "books", // Store matched books in an array named 'books'
-        },
-      },
-      {
-        $addFields: {
-          books: {
-            $sortArray: { input: "$books", sortBy: { index: 1 } }, // Sort books by index within each shelf
-          },
-        },
-      },
-      {
-        $project: {
-          // Project the desired fields for the response
-          _id: 1, // Include the shelf's _id
-          shelf: "$shelfName",
-          status: 1,
-          shelfIndex: 1,
-          books: {
-            _id: 1,
-            code: 1,
-            title: 1,
-            authors: 1,
-            pageCount: 1,
-            publishedDate: 1,
-            description: 1,
-            cover: 1,
-            shelfId: 1,
-            startedAt: 1,
-            finishedAt: 1,
-            rating: 1,
-            notes: 1,
-            status: 1,
-            tag: 1,
-            hide: 1,
-          },
-        },
-      },
-    ]);
-
+    const shelvesWithBooks = await groupBooksByShelfForUser(userId);
     res.status(200).json(shelvesWithBooks);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
+
 const addShelf = async (req, res) => {
   const { userId, status, name } = req.body;
   try {
@@ -201,19 +204,20 @@ const updateBook = async (req, res) => {
         { new: true } // Return the updated document
       );
     } else if (over) {
+      const activeBook = await Book.findById(id);
       if (over.switchShelf !== null) {
-        const activeBookIndex = await Book.findById(id, { index: 1 });
         await Book.updateMany(
           {
             shelfId: over.switchShelf,
-            index: { $gt: activeBookIndex.index },
+            index: { $gt: activeBook.index },
           },
           {
             $inc: { index: -1 },
           }
         );
       }
-      if (over?.type === "book") {
+      if (!over.switchShelf && activeBook.index === book.index) return;
+      else if (over?.type === "book") {
         if (over.index > book.index) {
           // If a > b, increment all books with index < a and >= b by 1
           await Book.updateMany(
@@ -254,6 +258,7 @@ const updateBook = async (req, res) => {
         const booksInShelf = await Book.find({
           shelfId: book.shelfId,
           status: book.status,
+          _id: { $ne: id },
         });
         let newIndex = booksInShelf.length;
         updatedBook = await Book.findByIdAndUpdate(
@@ -396,7 +401,38 @@ const deleteShelf = async (req, res) => {
     res.status(500).send({ error });
   }
 };
+const shareLibrary = async (req, res) => {
+  try {
+    const { userId } = req.params;
 
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    const token = jwt.sign({ userId }, process.env.LINK_TOKEN_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.status(200).json({ token });
+  } catch (error) {
+    res.status(500).json({ error: error });
+  }
+};
+const getSharedBooks = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const decoded = jwt.verify(token, process.env.LINK_TOKEN_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    const shelvesWithBooks = await groupBooksByShelfForUser(user._id);
+    res.status(200).json(shelvesWithBooks);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
 module.exports = {
   searchBook,
   addBooks,
@@ -408,4 +444,5 @@ module.exports = {
   renameShelf,
   updateBook,
   updateShelfIndex,
+  shareLibrary,
 };
