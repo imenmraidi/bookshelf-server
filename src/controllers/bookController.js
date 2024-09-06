@@ -205,6 +205,8 @@ const updateBook = async (req, res) => {
       );
     } else if (over) {
       const activeBook = await Book.findById(id);
+      if (!over.switchShelf && activeBook.index !== over.index)
+        over.index = activeBook.index;
       if (over.switchShelf !== null) {
         await Book.updateMany(
           {
@@ -216,6 +218,7 @@ const updateBook = async (req, res) => {
           }
         );
       }
+
       if (!over.switchShelf && activeBook.index === book.index) return;
       else if (over?.type === "book") {
         if (over.index > book.index) {
@@ -426,8 +429,8 @@ const getSharedBooks = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid token" });
     }
-    const shelvesWithBooks = await groupBooksByShelfForUser(user._id);
-    res.status(200).json(shelvesWithBooks);
+    const shelvesWithBooks = await groupBooksByShelfForUser(decoded.userId);
+    res.status(200).json({ shelvesWithBooks, sharer: user.name });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -445,4 +448,5 @@ module.exports = {
   updateBook,
   updateShelfIndex,
   shareLibrary,
+  getSharedBooks,
 };
