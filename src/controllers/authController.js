@@ -13,12 +13,16 @@ const googleLogin = async (req, res) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then(res => res.data);
-    //upsert User
-    const user = await User.findOneAndUpdate(
-      { email: userInfo.email },
-      { $set: { name: userInfo.name, isGoogleUser: true } },
-      { new: true, upsert: true }
-    );
+
+    let user = await User.findOne({ email: userInfo.email });
+    if (!user) {
+      // Create new user if it does not exist
+      user = await User.create({
+        email: userInfo.email,
+        name: userInfo.name,
+        isGoogleUser: true,
+      });
+    }
     // Create tokens
     const tokens = createTokens(user._id);
     // Set refresh token in cookies
@@ -132,6 +136,32 @@ const updateUsername = async (req, res) => {
     res.status(500).json({ error: error });
   }
 };
+const updatePassword = async (req, res) => {
+  const { id } = req.params;
+  const { newPass } = req.body;
+
+  if (!newPass) {
+    return res.status(400).json({ error: "New password is required." });
+  }
+  try {
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPass, 10);
+    // Find user and update password directly
+    const user = await User.findByIdAndUpdate(
+      id,
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    res.status(200).json({ message: "Password updated successfully." });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
 const createTokens = userId => {
   const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
     expiresIn: "15m",
@@ -149,4 +179,5 @@ module.exports = {
   signup,
   logout,
   refreshToken,
+  updatePassword,
 };
