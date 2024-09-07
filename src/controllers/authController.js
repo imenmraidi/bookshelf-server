@@ -125,6 +125,9 @@ const logout = async (req, res) => {
 const updateUsername = async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "New name is required." });
+  }
   try {
     const updatedUser = await User.findByIdAndUpdate(
       id,
@@ -144,18 +147,22 @@ const updatePassword = async (req, res) => {
     return res.status(400).json({ error: "New password is required." });
   }
   try {
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPass, 10);
-    // Find user and update password directly
-    const user = await User.findByIdAndUpdate(
-      id,
-      { password: hashedPassword },
-      { new: true }
-    );
-
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
+    // Check if the user is a Google user
+    if (user.isGoogleUser) {
+      return res
+        .status(403)
+        .json({ error: "Google users cannot change their password." });
+    }
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPass, 10);
+
+    // Update the password for non-Google users
+    user.password = hashedPassword;
+    await user.save();
     res.status(200).json({ message: "Password updated successfully." });
   } catch (error) {
     res.status(500).json({ error: "Internal server error." });

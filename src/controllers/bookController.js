@@ -24,7 +24,7 @@ const searchBook = async (req, res) => {
           authors: item.volumeInfo?.authors,
           pageCount: item.volumeInfo?.pageCount,
           cover: item.volumeInfo?.imageLinks?.thumbnail,
-          publishedDate: item.volumeInfo?.publishedDate,
+          publishedDate: item.volumeInfo?.publishedDate || "",
           description: item.volumeInfo?.description,
         };
       });
@@ -162,6 +162,16 @@ const groupBooksByShelfForUser = async userId => {
 const groupBooksByShelf = async (req, res) => {
   try {
     const { userId } = req.body;
+    const readingNowShelves = await Shelf.find({ userId, status: "C" });
+    if (readingNowShelves.length === 0) {
+      const newShelf = new Shelf({
+        userId,
+        shelfName: "CR",
+        shelfIndex: 0,
+        status:"C",
+      });
+      await newShelf.save();
+    }
     const shelvesWithBooks = await groupBooksByShelfForUser(userId);
     res.status(200).json(shelvesWithBooks);
   } catch (err) {
