@@ -23,7 +23,10 @@ const searchBook = async (req, res) => {
           title: item.volumeInfo?.title,
           authors: item.volumeInfo?.authors,
           pageCount: item.volumeInfo?.pageCount,
-          cover: item.volumeInfo?.imageLinks?.thumbnail,
+          cover: item.volumeInfo?.imageLinks?.thumbnail.replace(
+            "http://",
+            "https://"
+          ),
           publishedDate: item.volumeInfo?.publishedDate || "",
           description: item.volumeInfo?.description,
         };
@@ -168,7 +171,7 @@ const groupBooksByShelf = async (req, res) => {
         userId,
         shelfName: "CR",
         shelfIndex: 0,
-        status:"C",
+        status: "C",
       });
       await newShelf.save();
     }
