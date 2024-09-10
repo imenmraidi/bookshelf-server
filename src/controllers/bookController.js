@@ -59,6 +59,7 @@ const addBooks = async (req, res) => {
     // Check if any of the books already exist
     const existingBooks = await Book.find({
       code: { $in: books.map(book => book.code) },
+      userId: userId,
     });
 
     if (existingBooks.length > 0) {
@@ -79,7 +80,6 @@ const addBooks = async (req, res) => {
       await newshelf.save();
       addedShelf = newshelf._id;
     }
-
     let currentIndex;
     // Calculate the starting index for the new books
     const booksInShelf = await Book.find({
