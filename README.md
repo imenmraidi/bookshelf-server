@@ -1,4 +1,4 @@
-📚 Bookshelf - Server
+##📚 Bookshelf - Server
 
 This is the backend API for Bookshelf, a virtual library web application built with the MERN stack. It provides secure, token-based authentication and RESTful endpoints to manage users, books, notes, and libraries.
 
